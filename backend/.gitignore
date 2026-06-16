@@ -1,0 +1,14 @@
+/vendor
+/node_modules
+/.env
+/storage/*.key
+/storage/pail
+/public/hot
+/public/storage
+/public/build
+.phpunit.result.cache
+Homestead.json
+Homestead.yaml
+.fleet
+.idea
+.vscode

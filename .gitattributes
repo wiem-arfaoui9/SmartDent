@@ -1,0 +1,6 @@
+# Fins de ligne LF obligatoires pour les fichiers lus par Linux (évite "exec format error" sous Windows)
+*.sh          text eol=lf
+Dockerfile    text eol=lf
+*.conf        text eol=lf
+*.ini         text eol=lf
+docker-compose.yml text eol=lf

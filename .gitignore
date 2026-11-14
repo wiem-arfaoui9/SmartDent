@@ -1,0 +1,3 @@
+# Secrets Docker Compose (ne jamais commiter)
+.env
+!.env.example

@@ -1,0 +1,118 @@
+# SmartDent - Étape 2 DevOps : conteneurisation (db + backend PHP-FPM + frontend Nginx)
+name: smartdent
+
+services:
+  # ─────────────── Base de données ───────────────
+  db:
+    image: mysql:8.0
+    restart: unless-stopped
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE:-smartdent}
+      MYSQL_USER: ${DB_USERNAME:-smartdent}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD manquant - lancez scripts/init-env.ps1}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?DB_ROOT_PASSWORD manquant - lancez scripts/init-env.ps1}
+    volumes:
+      - dbdata:/var/lib/mysql
+    healthcheck:
+      # -h 127.0.0.1 (TCP) : ignore le serveur temporaire d'initialisation (socket uniquement)
+      test: ["CMD-SHELL", "MYSQL_PWD=\"$$MYSQL_ROOT_PASSWORD\" mysqladmin ping -h 127.0.0.1 -u root --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    networks:
+      - datanet
+
+  # ─────────────── Backend Laravel (PHP-FPM, non-root) ───────────────
+  backend:
+    build:
+      context: ./backend
+    image: smartdent/backend:${IMAGE_TAG:-dev}
+    restart: unless-stopped
+    init: true
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      APP_NAME: SmartDent
+      APP_ENV: production
+      APP_DEBUG: "false"
+      APP_KEY: ${APP_KEY:?APP_KEY manquant - lancez scripts/init-env.ps1}
+      APP_URL: http://localhost:${WEB_PORT:-8080}
+      LOG_CHANNEL: stderr
+      LOG_LEVEL: ${LOG_LEVEL:-warning}
+      DB_CONNECTION: mysql
+      DB_HOST: db
+      DB_PORT: "3306"
+      DB_DATABASE: ${DB_DATABASE:-smartdent}
+      DB_USERNAME: ${DB_USERNAME:-smartdent}
+      DB_PASSWORD: ${DB_PASSWORD}
+      CACHE_STORE: file
+      SESSION_DRIVER: file
+      QUEUE_CONNECTION: sync
+      FILESYSTEM_DISK: local
+      # Sanctum : le navigateur appelle l'API depuis l'origine de Nginx (même origine)
+      FRONTEND_URL: http://localhost:${WEB_PORT:-8080}
+      SANCTUM_STATEFUL_DOMAINS: localhost:${WEB_PORT:-8080},127.0.0.1:${WEB_PORT:-8080},localhost,127.0.0.1
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      RUN_SEED: ${RUN_SEED:-false}
+    volumes:
+      # PDF générés (reçus, ordonnances, dossiers) : persistants
+      - storagedata:/var/www/html/storage/app
+    # Chromium (génération PDF) a besoin de plus que les 64 Mo de /dev/shm par défaut
+    shm_size: 512m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      # Port FPM ouvert = entrypoint terminé (migrations faites)
+      test: ["CMD", "php", "-r", "exit(@fsockopen('127.0.0.1', 9000) ? 0 : 1);"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+    networks:
+      - frontnet
+      - datanet
+
+  # ─────────────── Frontend React + Nginx (non-root) ───────────────
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: /api
+    image: smartdent/frontend:${IMAGE_TAG:-dev}
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${WEB_PORT:-8080}:8080"
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      # Teste toute la chaîne : Nginx -> FastCGI -> Laravel (/up)
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/up || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - frontnet
+
+volumes:
+  dbdata:
+  storagedata:
+
+networks:
+  frontnet:
+  datanet:
+    # Réseau interne : la base de données n est joignable que par le backend
+    internal: true

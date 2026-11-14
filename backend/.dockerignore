@@ -1,0 +1,26 @@
+# Secrets et fichiers locaux
+.env
+.env.*
+!.env.example
+
+# Dépendances et caches reconstruits dans l'image
+vendor
+node_modules
+.git
+.gitignore
+.idea
+.vscode
+
+# Données d'exécution (ne jamais embarquer sessions, logs, uploads)
+storage/logs/*
+storage/framework/sessions/*
+storage/framework/cache/*
+storage/framework/views/*
+storage/app/public/*
+bootstrap/cache/*.php
+
+tests
+.phpunit.result.cache
+*.md
+Dockerfile
+.dockerignore

@@ -46,6 +46,13 @@ jobs:
       - name: Valider composer.json
         run: composer validate --no-check-publish
 
+      # Git ne suit pas les dossiers vides : sans eux, "composer install" échoue
+      # ("Please provide a valid cache path") dans le script package:discover.
+      - name: Préparer les dossiers Laravel
+        run: |
+          mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views \
+                   storage/logs storage/app/public bootstrap/cache
+
       - name: Installer les dépendances
         run: composer install --no-interaction --no-progress --prefer-dist
 

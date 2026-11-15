@@ -159,3 +159,48 @@ jobs:
       - name: Nettoyer
         if: always()
         run: docker compose down -v
+
+  # ───────────── Stage "push" (étape 4) ─────────────
+  # Pousse les images vers Harbor. Harbor tourne sur TON ordinateur : seul un runner
+  # auto-hébergé (label "local") peut l'atteindre. Les runners GitHub (cloud) ne le peuvent pas.
+  # Le job est ignoré tant que la variable HARBOR_REGISTRY n'est pas définie.
+  push-harbor:
+    name: Push des images vers Harbor
+    needs: build-images
+    if: github.ref == 'refs/heads/main' && vars.HARBOR_REGISTRY != ''
+    runs-on: [self-hosted, local]
+    timeout-minutes: 45
+    env:
+      REGISTRY: ${{ vars.HARBOR_REGISTRY }}
+      PROJECT: ${{ vars.HARBOR_PROJECT || 'devops' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Calculer le tag de l'image
+        run: echo "IMAGE_TAG=${GITHUB_SHA::7}" >> "$GITHUB_ENV"
+
+      # Identifiants = secrets GitHub (Settings > Secrets and variables > Actions), jamais en dur
+      - name: Connexion à Harbor
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ vars.HARBOR_REGISTRY }}
+          username: ${{ secrets.HARBOR_USERNAME }}
+          password: ${{ secrets.HARBOR_PASSWORD }}
+
+      - name: Construire les images
+        run: |
+          sh scripts/init-env.sh
+          docker compose build
+
+      - name: Tagger et pousser vers Harbor
+        run: |
+          set -eu
+          for svc in backend frontend; do
+            src="smartdent/${svc}:${IMAGE_TAG}"
+            dst="${REGISTRY}/${PROJECT}/smartdent-${svc}"
+            docker tag "$src" "${dst}:${IMAGE_TAG}"
+            docker tag "$src" "${dst}:latest"
+            docker push "${dst}:${IMAGE_TAG}"
+            docker push "${dst}:latest"
+            echo "Poussé : ${dst}:${IMAGE_TAG} et :latest"
+          done

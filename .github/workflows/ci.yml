@@ -145,6 +145,7 @@ jobs:
           set -eu
           B=http://localhost:8080
           curl -fsS -o /dev/null "$B/up"
+          curl -fsS "$B/api/health" | grep -q '"database":"up"'
           curl -fsS "$B/" | grep -qi '<div id="root"'
           jar=$(mktemp)
           curl -fsS -c "$jar" -b "$jar" -H "Origin: $B" -H "Referer: $B/" -o /dev/null "$B/sanctum/csrf-cookie"
@@ -152,7 +153,7 @@ jobs:
           curl -fsS -c "$jar" -b "$jar" -H "Origin: $B" -H "Referer: $B/" \
             -H "X-XSRF-TOKEN: $xsrf" -H "Accept: application/json" -H "Content-Type: application/json" \
             -d '{"email":"admin@smartdent.com","password":"password"}' "$B/api/login" | grep -q '"token"'
-          echo "OK : /up, SPA, cookie CSRF et login Sanctum fonctionnent."
+          echo "OK : /up, /api/health, SPA, cookie CSRF et login Sanctum fonctionnent."
 
       # Publication seulement après un test réussi : on ne publie que des images validées
       - name: Connexion à GHCR

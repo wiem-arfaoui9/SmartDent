@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\PatientController;
@@ -26,6 +27,20 @@ use App\Http\Controllers\PortailPatientController;
 // ── Auth publiques ──
 Route::post('/login',    [AuthController::class, 'login']);
 Route::post('/register', [AuthController::class, 'register']);
+
+// ── Santé (supervision : Uptime Kuma, CI) ── publique, vérifie aussi la base de données
+Route::get('/health', function () {
+    $status = 'ok';
+    try {
+        DB::select('select 1');
+        $database = 'up';
+    } catch (\Throwable $e) {
+        $status = 'degraded';
+        $database = 'down';
+    }
+
+    return response()->json(['status' => $status, 'database' => $database], $database === 'up' ? 200 : 503);
+});
 
 // ── Routes protégées (Sanctum) ──
 Route::middleware('auth:sanctum')->group(function () {

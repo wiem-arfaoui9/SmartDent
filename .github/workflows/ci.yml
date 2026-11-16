@@ -111,6 +111,10 @@ jobs:
     if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # packages: write = droit de publier sur GHCR avec le GITHUB_TOKEN (aucun secret à créer)
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v4
 
@@ -149,6 +153,29 @@ jobs:
             -H "X-XSRF-TOKEN: $xsrf" -H "Accept: application/json" -H "Content-Type: application/json" \
             -d '{"email":"admin@smartdent.com","password":"password"}' "$B/api/login" | grep -q '"token"'
           echo "OK : /up, SPA, cookie CSRF et login Sanctum fonctionnent."
+
+      # Publication seulement après un test réussi : on ne publie que des images validées
+      - name: Connexion à GHCR
+        if: github.ref == 'refs/heads/main'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pousser les images vers GHCR
+        if: github.ref == 'refs/heads/main'
+        run: |
+          set -eu
+          owner="${GITHUB_REPOSITORY_OWNER,,}"   # GHCR exige des minuscules
+          for svc in backend frontend; do
+            dst="ghcr.io/${owner}/smartdent-${svc}"
+            docker tag "smartdent/${svc}:${IMAGE_TAG}" "${dst}:${IMAGE_TAG}"
+            docker tag "smartdent/${svc}:${IMAGE_TAG}" "${dst}:latest"
+            docker push "${dst}:${IMAGE_TAG}"
+            docker push "${dst}:latest"
+            echo "Poussé : ${dst}:${IMAGE_TAG} et :latest"
+          done
 
       - name: Logs en cas d'échec
         if: failure()

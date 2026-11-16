@@ -17,6 +17,7 @@ RUN npm install --prefix /opt/pdf --omit=dev --no-audit --no-fund puppeteer@23.1
 
 # ───────────── Étape 3 : image d'exécution (PHP-FPM) ─────────────
 FROM php:8.3-fpm-bookworm AS runtime
+LABEL org.opencontainers.image.source="https://github.com/wiem-arfaoui9/SmartDent"
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends chromium fonts-liberation fonts-dejavu-core \

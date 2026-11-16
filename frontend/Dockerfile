@@ -14,6 +14,7 @@ RUN npm run build
 
 # ───────────── Étape 2 : Nginx non-root ─────────────
 FROM nginxinc/nginx-unprivileged:1.27-alpine AS runtime
+LABEL org.opencontainers.image.source="https://github.com/wiem-arfaoui9/SmartDent"
 COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=builder /app/dist /usr/share/nginx/html
 EXPOSE 8080
